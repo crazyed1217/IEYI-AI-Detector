@@ -6,105 +6,121 @@ import matplotlib.pyplot as plt
 from audio_recorder_streamlit import audio_recorder
 import io
 
-# 1. 網頁頁面與團隊資訊設定
-st.set_page_config(page_title="IEYI AI語音防詐騙系統", page_icon="🛡️", layout="wide")
+# 1. 網頁頁面設定
+st.set_page_config(page_title="AI語音偵測系統", page_icon="🛡️", layout="wide")
 
+# 2. 自定義 CSS 美化
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f8f9fa;
+    }
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .result-card {
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        color: white;
+    }
+    .success-bg { background-color: #28a745; }
+    .error-bg { background-color: #dc3545; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 3. 標題與團隊資訊
 st.title("🛡️ AI 語音防詐騙即時偵測系統")
-st.markdown("### 2026 IEYI 世界青少年發明展 - 參賽作品展示")
-st.markdown("#### 團隊成員：林口康橋 范懿飛 George | 延平中學 范坤翔 Charles | 衛理女中 范瑀媗 Rose")
+st.markdown("##### 2026 IEYI 世界青少年發明展 | 技術展示版")
 
-# 側邊欄：科學原理說明
-with st.sidebar:
-    st.header("🔬 技術偵測原理")
-    st.info("""
-    **本系統監測三大關鍵指標：**
-    1. **ZCR (過零率)**：偵測頻率變化的隨機性。AI 語音通常變化率低於 0.115。
-    2. **MFCC Var (音色變異數)**：分析聲音的諧波豐富度。AI 的音色指紋通常低於 10400。
-    3. **RMS (能量)**：觀測聲音的物理動力。
-    """)
-    st.warning("⚠️ 提醒：現場環境吵雜時，建議使用外接麥克風以確保分析精準。")
+# 團隊成員介紹
+col_team1, col_team2, col_team3 = st.columns(3)
+col_team1.caption("林口康橋 范懿飛 George")
+col_team2.caption("延平中學 范坤翔 Charles")
+col_team3.caption("衛理女中 范瑀媗 Rose")
+st.markdown("---")
 
 # 核心分析功能
 def process_audio(audio_bytes, title):
     if audio_bytes:
-        # 讀取音訊
         audio_segment = io.BytesIO(audio_bytes)
-        y, sr = librosa.load(audio_segment, sr=16000)
-        
-        # --- 數據運算 ---
-        # A. RMS 能量
-        rms = np.mean(librosa.feature.rms(y=y))
-        # B. ZCR 過零率
-        zcr = np.mean(librosa.feature.zero_crossing_rate(y=y))
-        # C. MFCC 音色分析 (針對高階 AI 的關鍵特徵)
-        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-        mfcc_var = np.var(mfccs) 
-
-        # --- 最終優化判定邏輯 (針對 Deevid AI 全系列樣本校準) ---
-        ai_score = 0
-        
-        # 門檻 1：ZCR 判定 (AI 樣本實測 0.088 vs 真人 0.127)
-        if zcr < 0.115: 
-            ai_score += 1
-        
-        # 門檻 2：MFCC Var 判定 (AI 樣本實測 9245 vs 真人 10943)
-        if mfcc_var < 10400: 
-            ai_score += 1
+        try:
+            y, sr = librosa.load(audio_segment, sr=16000)
             
-        # 門檻 3：極端特徵判定 (如果 ZCR 低於 0.095，通常是數位合成的鐵證)
-        if zcr < 0.095:
-            ai_score += 1
-
-        # --- 結果顯示 ---
-        st.markdown(f"### 🔍 分析來源: {title}")
-        
-        # 綜合評分判定
-        if ai_score >= 2:
-            st.error(f"🚨 偵測結果：高風險！可能是 AI 模擬語音 (AI 評分: {ai_score}/3)")
-            st.write(f"【判定依據】系統偵測到音色豐富度較低 ({mfcc_var:.1f}) 且頻率變換率過低 ({zcr:.4f})，符合數位合成特徵。")
-        else:
-            st.success(f"✅ 偵測結果：極可能是真人語音 (AI 評分: {ai_score}/3)")
-            st.write(f"【判定依據】聲波具備自然的動態範圍、諧波指紋豐富度以及自然的頻率變化。")
-
-        # --- 數據儀表板 ---
-        st.markdown("#### 📊 聲學關鍵指標數據庫")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("RMS (能量)", f"{rms:.5f}")
-        c2.metric("ZCR (頻率變化率)", f"{zcr:.5f}")
-        c3.metric("MFCC Var (音色豐富度)", f"{mfcc_var:.1f}")
-
-        # --- 視覺化圖表 ---
-        st.markdown("---")
-        col_plot1, col_plot2 = st.columns(2)
-        
-        with col_plot1:
-            fig1, ax1 = plt.subplots()
-            librosa.display.waveshow(y, sr=sr, ax=ax1, color='#1f77b4')
-            ax1.set_title("Waveform (時間域波形 - 觀察能量起伏)")
-            st.pyplot(fig1)
+            if len(y) < 1024:
+                st.warning("⚠️ 錄音過短，請再試一次。")
+                return
             
-        with col_plot2:
-            fig2, ax2 = plt.subplots()
-            D = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
-            librosa.display.specshow(D, sr=sr, ax=ax2, x_axis='time', y_axis='hz')
-            ax2.set_title("Spectrogram (頻譜圖 - 觀察諧波指紋)")
-            st.pyplot(fig2)
+            # 聲學運算
+            rms = np.mean(librosa.feature.rms(y=y))
+            zcr = np.mean(librosa.feature.zero_crossing_rate(y=y))
+            mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+            mfcc_var = np.var(mfccs) 
 
-# 網頁介面導覽
-tab1, tab2 = st.tabs(["🎙️ 現場錄音測試 (Live Record)", "📂 上傳音訊檔案 (Upload File)"])
+            # IEYI 現場穩定版邏輯
+            ai_score = 0
+            if zcr < 0.085: ai_score += 1
+            if mfcc_var < 10400: ai_score += 1
+            if zcr < 0.10 and mfcc_var < 10800: ai_score += 1
+
+            # 4. 判定結果美化顯示
+            if ai_score >= 2:
+                st.markdown(f"""
+                <div class="result-card error-bg">
+                    <h2>🚨 偵測結果：高風險 AI 語音 (評分: {ai_score}/3)</h2>
+                    <p>偵測到數位合成特徵，請警惕該音訊來源。</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="result-card success-bg">
+                    <h2>✅ 偵測結果：安全真人語音 (評分: {ai_score}/3)</h2>
+                    <p>聲波具備自然人聲諧波，未偵測到數位合成痕跡。</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # 5. 數據儀表板 (Metric Cards)
+            st.markdown("### 📊 關鍵聲學數據指標")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("RMS 能量起伏", f"{rms:.4f}")
+            c2.metric("ZCR 頻率隨機性", f"{zcr:.4f}")
+            c3.metric("MFCC 音色指紋", f"{mfcc_var:.1f}")
+
+            # 6. 視覺化圖表美化
+            st.markdown("---")
+            col_plot1, col_plot2 = st.columns(2)
+            
+            with col_plot1:
+                st.write("📈 **時間域波形 (Waveform)**")
+                fig1, ax1 = plt.subplots(figsize=(10, 4))
+                librosa.display.waveshow(y, sr=sr, ax=ax1, color='#007bff')
+                ax1.set_axis_off()
+                st.pyplot(fig1)
+                
+            with col_plot2:
+                st.write("🌈 **頻譜圖特徵 (Spectrogram)**")
+                fig2, ax2 = plt.subplots(figsize=(10, 4))
+                D = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
+                librosa.display.specshow(D, sr=sr, ax=ax2, x_axis='time', y_axis='hz')
+                ax2.set_axis_off()
+                st.pyplot(fig2)
+
+        except Exception as e:
+            st.error(f"分析失敗，請重試。錯誤碼: {e}")
+
+# 分頁區
+tab1, tab2 = st.tabs(["🎙️ 現場偵測", "📂 檔案上傳"])
 
 with tab1:
-    st.write("請點擊麥克風後開始說話（建議 3-5 秒），結束請再按一次麥克風：")
-    recorded_audio = audio_recorder(
-        text="點擊錄音",
-        recording_color="#e8b62c",
-        neutral_color="#6aa36f",
-        icon_size="3x",
-    )
+    st.write("請點擊麥克風並開始說話：")
+    recorded_audio = audio_recorder(text="", recording_color="#dc3545", neutral_color="#6c757d", icon_size="3x")
     if recorded_audio:
-        process_audio(recorded_audio, "現場錄音")
+        process_audio(recorded_audio, "現場測試")
 
 with tab2:
-    uploaded_file = st.file_uploader("請選擇音訊檔案 (.wav / .mp3 / .m4a)", type=['wav', 'mp3', 'm4a'])
-    if uploaded_file is not None:
+    uploaded_file = st.file_uploader("上傳 .wav 或 .mp3 檔案", type=['wav', 'mp3'])
+    if uploaded_file:
         process_audio(uploaded_file.read(), "檔案分析")
